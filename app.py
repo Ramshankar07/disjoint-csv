@@ -7,6 +7,23 @@ import zipfile
 def filter_alphanumeric(value):
     return bool(re.match('^[a-zA-Z0-9]+$', str(value)))
 
+def get_csv_headers(file):
+    content = io.StringIO(file.getvalue().decode("utf-8"))
+    reader = csv.reader(content)
+    return next(reader, [])
+
+def validate_column_name(file1, file2, column_name):
+    headers1 = get_csv_headers(file1)
+    headers2 = get_csv_headers(file2)
+    
+    if column_name not in headers1 and column_name not in headers2:
+        return False, "The specified column name is not present in either file."
+    elif column_name not in headers1:
+        return False, f"The specified column name is not present in the first file. Available columns: {', '.join(headers1)}"
+    elif column_name not in headers2:
+        return False, f"The specified column name is not present in the second file. Available columns: {', '.join(headers2)}"
+    return True, ""
+
 def process_csv_files(file1, file2, column_name):
     def read_csv(file):
         content = io.StringIO(file.getvalue().decode("utf-8"))
@@ -51,19 +68,23 @@ def main():
     column_name = st.text_input("Enter the column name to compare")
 
     if file1 and file2 and column_name:
-        if st.button("Process Files and Download Results"):
-            unique_sheet1, unique_sheet2, common = process_csv_files(file1, file2, column_name)
+        is_valid, message = validate_column_name(file1, file2, column_name)
+        if not is_valid:
+            st.error(message)
+        else:
+            if st.button("Process Files and Download Results"):
+                unique_sheet1, unique_sheet2, common = process_csv_files(file1, file2, column_name)
 
-            st.write("Files processed successfully!")
+                st.success("Files processed successfully!")
 
-            zip_file = create_zip_file(unique_sheet1, unique_sheet2, common)
+                zip_file = create_zip_file(unique_sheet1, unique_sheet2, common)
 
-            st.download_button(
-                label="Download All Results (ZIP)",
-                data=zip_file,
-                file_name="csv_comparison_results.zip",
-                mime="application/zip"
-            )
+                st.download_button(
+                    label="Download All Results (ZIP)",
+                    data=zip_file,
+                    file_name="csv_comparison_results.zip",
+                    mime="application/zip"
+                )
 
 if __name__ == "__main__":
     main()
