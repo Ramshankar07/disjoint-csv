@@ -2,6 +2,7 @@ import streamlit as st
 import csv
 import re
 import io
+import zipfile
 
 def filter_alphanumeric(value):
     return bool(re.match('^[a-zA-Z0-9]+$', str(value)))
@@ -32,6 +33,14 @@ def write_csv(data):
         writer.writerows(data)
     return output.getvalue()
 
+def create_zip_file(unique_sheet1, unique_sheet2, common):
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        zip_file.writestr("unique_sheet1.csv", write_csv(unique_sheet1))
+        zip_file.writestr("unique_sheet2.csv", write_csv(unique_sheet2))
+        zip_file.writestr("common.csv", write_csv(common))
+    return zip_buffer.getvalue()
+
 def main():
     st.title("CSV Comparison App")
 
@@ -42,30 +51,18 @@ def main():
     column_name = st.text_input("Enter the column name to compare")
 
     if file1 and file2 and column_name:
-        if st.button("Process Files"):
+        if st.button("Process Files and Download Results"):
             unique_sheet1, unique_sheet2, common = process_csv_files(file1, file2, column_name)
 
             st.write("Files processed successfully!")
 
-            st.download_button(
-                label="Download Unique Sheet 1",
-                data=write_csv(unique_sheet1),
-                file_name="unique_sheet1.csv",
-                mime="text/csv"
-            )
+            zip_file = create_zip_file(unique_sheet1, unique_sheet2, common)
 
             st.download_button(
-                label="Download Unique Sheet 2",
-                data=write_csv(unique_sheet2),
-                file_name="unique_sheet2.csv",
-                mime="text/csv"
-            )
-
-            st.download_button(
-                label="Download Common Values",
-                data=write_csv(common),
-                file_name="common.csv",
-                mime="text/csv"
+                label="Download All Results (ZIP)",
+                data=zip_file,
+                file_name="csv_comparison_results.zip",
+                mime="application/zip"
             )
 
 if __name__ == "__main__":
