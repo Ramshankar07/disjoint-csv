@@ -11,6 +11,8 @@ def filter_alphanumeric(df, column_name):
 
 def safe_read_csv(file):
     try:
+        # Reset the file pointer to the beginning
+        file.seek(0)
         return pd.read_csv(file)
     except pd.errors.EmptyDataError:
         return pd.DataFrame()
@@ -20,11 +22,11 @@ def validate_column_name(file1, file2, column_name):
     df2 = safe_read_csv(file2)
     
     if df1.empty and df2.empty:
-        return False, "Both uploaded files are empty. Please upload valid CSV files."
+        return False, "Both uploaded files are empty or couldn't be read. Please upload valid CSV files."
     elif df1.empty:
-        return False, "The first uploaded file is empty. Please upload a valid CSV file."
+        return False, "The first uploaded file is empty or couldn't be read. Please upload a valid CSV file."
     elif df2.empty:
-        return False, "The second uploaded file is empty. Please upload a valid CSV file."
+        return False, "The second uploaded file is empty or couldn't be read. Please upload a valid CSV file."
     
     if column_name not in df1.columns and column_name not in df2.columns:
         return False, f"The specified column name '{column_name}' is not present in either file. Available columns in first file: {', '.join(df1.columns)}\nAvailable columns in second file: {', '.join(df2.columns)}"
@@ -40,7 +42,7 @@ def process_csv_files(file1, file2, column_name):
     sheet2 = safe_read_csv(file2)
 
     if sheet1.empty or sheet2.empty:
-        st.error("One or both of the uploaded files are empty. Please upload valid CSV files.")
+        st.error("One or both of the uploaded files are empty or couldn't be read. Please upload valid CSV files.")
         return None, None, None
 
     # Filter out rows that do not have alphanumeric values
@@ -73,7 +75,7 @@ def main():
     file2 = st.file_uploader("Upload second CSV file", type="csv")
     column_name = st.text_input("Enter the column name to compare")
 
-    if file1 and file2 and column_name:
+    if file1 is not None and file2 is not None and column_name:
         is_valid, message = validate_column_name(file1, file2, column_name)
         if not is_valid:
             st.error(message)
