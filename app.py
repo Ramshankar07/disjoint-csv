@@ -8,7 +8,7 @@ def filter_alphanumeric(value):
     return bool(re.match('^[a-zA-Z0-9]+$', str(value)))
 
 def get_csv_headers(file):
-    content = io.StringIO(file.getvalue().decode("utf-8"))
+    content = io.StringIO(file.getvalue().decode("utf-8-sig"))  # Use utf-8-sig to handle BOM
     reader = csv.reader(content)
     return next(reader, [])
 
@@ -16,29 +16,34 @@ def validate_column_name(file1, file2, column_name):
     headers1 = get_csv_headers(file1)
     headers2 = get_csv_headers(file2)
     
+    # Strip any leading/trailing whitespace from column names
+    headers1 = [h.strip() for h in headers1]
+    headers2 = [h.strip() for h in headers2]
+    column_name = column_name.strip()
+    
     if column_name not in headers1 and column_name not in headers2:
-        return False, "The specified column name is not present in either file."
+        return False, f"The specified column name '{column_name}' is not present in either file. Available columns in first file: {', '.join(headers1)}\nAvailable columns in second file: {', '.join(headers2)}"
     elif column_name not in headers1:
-        return False, f"The specified column name is not present in the first file. Available columns: {', '.join(headers1)}"
+        return False, f"The specified column name '{column_name}' is not present in the first file. Available columns: {', '.join(headers1)}"
     elif column_name not in headers2:
-        return False, f"The specified column name is not present in the second file. Available columns: {', '.join(headers2)}"
+        return False, f"The specified column name '{column_name}' is not present in the second file. Available columns: {', '.join(headers2)}"
     return True, ""
 
 def process_csv_files(file1, file2, column_name):
     def read_csv(file):
-        content = io.StringIO(file.getvalue().decode("utf-8"))
+        content = io.StringIO(file.getvalue().decode("utf-8-sig"))  # Use utf-8-sig to handle BOM
         reader = csv.DictReader(content)
-        return [row for row in reader if filter_alphanumeric(row.get(column_name, ''))]
+        return [row for row in reader if filter_alphanumeric(row.get(column_name.strip(), ''))]
 
     sheet1 = read_csv(file1)
     sheet2 = read_csv(file2)
 
-    values1 = set(row[column_name] for row in sheet1)
-    values2 = set(row[column_name] for row in sheet2)
+    values1 = set(row[column_name.strip()] for row in sheet1)
+    values2 = set(row[column_name.strip()] for row in sheet2)
 
-    unique_sheet1 = [row for row in sheet1 if row[column_name] not in values2]
-    unique_sheet2 = [row for row in sheet2 if row[column_name] not in values1]
-    common = [row for row in sheet1 if row[column_name] in values2]
+    unique_sheet1 = [row for row in sheet1 if row[column_name.strip()] not in values2]
+    unique_sheet2 = [row for row in sheet2 if row[column_name.strip()] not in values1]
+    common = [row for row in sheet1 if row[column_name.strip()] in values2]
 
     return unique_sheet1, unique_sheet2, common
 
