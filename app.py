@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import io
 import zipfile
+import openpyxl
 
 def filter_alphanumeric(df, column_name):
     # Keep only rows where the column's value contains only alphanumeric characters
@@ -58,12 +59,18 @@ def process_csv_files(file1, file2, column_name):
 
     return unique_sheet1, unique_sheet2, common
 
+def create_excel_file(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Sheet1')
+    return output.getvalue()
+
 def create_zip_file(unique_sheet1, unique_sheet2, common):
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-        zip_file.writestr("unique_sheet1.csv", unique_sheet1.to_csv(index=False))
-        zip_file.writestr("unique_sheet2.csv", unique_sheet2.to_csv(index=False))
-        zip_file.writestr("common.csv", common.to_csv(index=False))
+        zip_file.writestr("unique_sheet1.xlsx", create_excel_file(unique_sheet1))
+        zip_file.writestr("unique_sheet2.xlsx", create_excel_file(unique_sheet2))
+        zip_file.writestr("common.xlsx", create_excel_file(common))
     return zip_buffer.getvalue()
 
 def main():
@@ -91,7 +98,7 @@ def main():
                     st.download_button(
                         label="Download All Results (ZIP)",
                         data=zip_file,
-                        file_name="csv_comparison_results.zip",
+                        file_name="excel_comparison_results.zip",
                         mime="application/zip"
                     )
 
