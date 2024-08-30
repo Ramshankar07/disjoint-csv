@@ -1,66 +1,50 @@
 import streamlit as st
-import csv
+import pandas as pd
 import re
 import io
 import zipfile
 
-def filter_alphanumeric(value):
-    return bool(re.match('^[a-zA-Z0-9]+$', str(value)))
-
-def get_csv_headers(file):
-    content = io.StringIO(file.getvalue().decode("utf-8-sig"))  # Use utf-8-sig to handle BOM
-    reader = csv.reader(content)
-    return next(reader, [])
+def filter_alphanumeric(df, column_name):
+    # Keep only rows where the column's value contains only alphanumeric characters
+    df = df[df[column_name].apply(lambda x: bool(re.match('^[a-zA-Z0-9]+$', str(x))))]
+    return df
 
 def validate_column_name(file1, file2, column_name):
-    headers1 = get_csv_headers(file1)
-    headers2 = get_csv_headers(file2)
+    df1 = pd.read_csv(file1)
+    df2 = pd.read_csv(file2)
     
-    # Strip any leading/trailing whitespace from column names
-    headers1 = [h.strip() for h in headers1]
-    headers2 = [h.strip() for h in headers2]
-    column_name = column_name.strip()
-    
-    if column_name not in headers1 and column_name not in headers2:
-        return False, f"The specified column name '{column_name}' is not present in either file. Available columns in first file: {', '.join(headers1)}\nAvailable columns in second file: {', '.join(headers2)}"
-    elif column_name not in headers1:
-        return False, f"The specified column name '{column_name}' is not present in the first file. Available columns: {', '.join(headers1)}"
-    elif column_name not in headers2:
-        return False, f"The specified column name '{column_name}' is not present in the second file. Available columns: {', '.join(headers2)}"
+    if column_name not in df1.columns and column_name not in df2.columns:
+        return False, f"The specified column name '{column_name}' is not present in either file. Available columns in first file: {', '.join(df1.columns)}\nAvailable columns in second file: {', '.join(df2.columns)}"
+    elif column_name not in df1.columns:
+        return False, f"The specified column name '{column_name}' is not present in the first file. Available columns: {', '.join(df1.columns)}"
+    elif column_name not in df2.columns:
+        return False, f"The specified column name '{column_name}' is not present in the second file. Available columns: {', '.join(df2.columns)}"
     return True, ""
 
 def process_csv_files(file1, file2, column_name):
-    def read_csv(file):
-        content = io.StringIO(file.getvalue().decode("utf-8-sig"))  # Use utf-8-sig to handle BOM
-        reader = csv.DictReader(content)
-        return [row for row in reader if filter_alphanumeric(row.get(column_name.strip(), ''))]
+    # Load the two CSV files
+    sheet1 = pd.read_csv(file1)
+    sheet2 = pd.read_csv(file2)
 
-    sheet1 = read_csv(file1)
-    sheet2 = read_csv(file2)
+    # Filter out rows that do not have alphanumeric values
+    sheet1 = filter_alphanumeric(sheet1, column_name)
+    sheet2 = filter_alphanumeric(sheet2, column_name)
 
-    values1 = set(row[column_name.strip()] for row in sheet1)
-    values2 = set(row[column_name.strip()] for row in sheet2)
+    # Find unique values in each sheet
+    unique_sheet1 = sheet1[~sheet1[column_name].isin(sheet2[column_name])]
+    unique_sheet2 = sheet2[~sheet2[column_name].isin(sheet1[column_name])]
 
-    unique_sheet1 = [row for row in sheet1 if row[column_name.strip()] not in values2]
-    unique_sheet2 = [row for row in sheet2 if row[column_name.strip()] not in values1]
-    common = [row for row in sheet1 if row[column_name.strip()] in values2]
+    # Find common values between both sheets
+    common = pd.merge(sheet1, sheet2, on=column_name)
 
     return unique_sheet1, unique_sheet2, common
-
-def write_csv(data):
-    output = io.StringIO()
-    if data:
-        writer = csv.DictWriter(output, fieldnames=data[0].keys())
-        writer.writeheader()
-        writer.writerows(data)
-    return output.getvalue()
 
 def create_zip_file(unique_sheet1, unique_sheet2, common):
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-        zip_file.writestr("unique_sheet1.csv", write_csv(unique_sheet1))
-        zip_file.writestr("unique_sheet2.csv", write_csv(unique_sheet2))
-        zip_file.writestr("common.csv", write_csv(common))
+        zip_file.writestr("unique_sheet1.csv", unique_sheet1.to_csv(index=False))
+        zip_file.writestr("unique_sheet2.csv", unique_sheet2.to_csv(index=False))
+        zip_file.writestr("common.csv", common.to_csv(index=False))
     return zip_buffer.getvalue()
 
 def main():
