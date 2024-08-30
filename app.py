@@ -9,9 +9,22 @@ def filter_alphanumeric(df, column_name):
     df = df[df[column_name].apply(lambda x: bool(re.match('^[a-zA-Z0-9]+$', str(x))))]
     return df
 
+def safe_read_csv(file):
+    try:
+        return pd.read_csv(file)
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
+
 def validate_column_name(file1, file2, column_name):
-    df1 = pd.read_csv(file1)
-    df2 = pd.read_csv(file2)
+    df1 = safe_read_csv(file1)
+    df2 = safe_read_csv(file2)
+    
+    if df1.empty and df2.empty:
+        return False, "Both uploaded files are empty. Please upload valid CSV files."
+    elif df1.empty:
+        return False, "The first uploaded file is empty. Please upload a valid CSV file."
+    elif df2.empty:
+        return False, "The second uploaded file is empty. Please upload a valid CSV file."
     
     if column_name not in df1.columns and column_name not in df2.columns:
         return False, f"The specified column name '{column_name}' is not present in either file. Available columns in first file: {', '.join(df1.columns)}\nAvailable columns in second file: {', '.join(df2.columns)}"
@@ -23,8 +36,12 @@ def validate_column_name(file1, file2, column_name):
 
 def process_csv_files(file1, file2, column_name):
     # Load the two CSV files
-    sheet1 = pd.read_csv(file1)
-    sheet2 = pd.read_csv(file2)
+    sheet1 = safe_read_csv(file1)
+    sheet2 = safe_read_csv(file2)
+
+    if sheet1.empty or sheet2.empty:
+        st.error("One or both of the uploaded files are empty. Please upload valid CSV files.")
+        return None, None, None
 
     # Filter out rows that do not have alphanumeric values
     sheet1 = filter_alphanumeric(sheet1, column_name)
@@ -64,16 +81,17 @@ def main():
             if st.button("Process Files and Download Results"):
                 unique_sheet1, unique_sheet2, common = process_csv_files(file1, file2, column_name)
 
-                st.success("Files processed successfully!")
+                if unique_sheet1 is not None and unique_sheet2 is not None and common is not None:
+                    st.success("Files processed successfully!")
 
-                zip_file = create_zip_file(unique_sheet1, unique_sheet2, common)
+                    zip_file = create_zip_file(unique_sheet1, unique_sheet2, common)
 
-                st.download_button(
-                    label="Download All Results (ZIP)",
-                    data=zip_file,
-                    file_name="csv_comparison_results.zip",
-                    mime="application/zip"
-                )
+                    st.download_button(
+                        label="Download All Results (ZIP)",
+                        data=zip_file,
+                        file_name="csv_comparison_results.zip",
+                        mime="application/zip"
+                    )
 
 if __name__ == "__main__":
     main()
