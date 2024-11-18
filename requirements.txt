@@ -1,6 +1,2 @@
 openpyxl
 streamlit
-zipfile
-re
-io
-os
